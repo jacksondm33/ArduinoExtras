@@ -1,0 +1,182 @@
+#include <SimbleeCOM.h>
+
+//#define DEBUG
+
+const int dataLength = 10;
+float weightFLdifference = 0;
+float weightBLdifference = 0;
+int topleft;
+int topright;
+int bottomleft;
+int bottomright;
+int opacity1;
+int opacity2;
+int opacity3;
+int opacity4;
+int BLval;
+int TLval;
+int TRval;
+int BRval;
+int BLvalpercent;
+int BRpercentval;
+int TLpercentval;
+int TRpercentval;
+int randNum1;
+int randNum2;
+int randNum3;
+int randNum4;
+int StatusUpdate;
+int Calibrate;
+float zeroval = 0;
+float zerovalFL = 0;
+float zerovalFR = 0;
+float zerovalBL = 0;
+float zerovalBR = 0;
+const int PinBL = 2;
+const int PinFL = 3;
+const int PinFR = 4;
+const int PinBR = 6;
+int FLData = 0;
+int FRData = 0;
+int BLData = 0;
+int BRData = 0;
+volatile int i = 0;
+float FLArray[dataLength] = {0, 1, 2, 3, 4, 0, 1, 2, 3, 4};
+float BLArray[dataLength] = {0, 1, 2, 3, 4, 0, 1, 2, 3, 4};
+float FRArray[dataLength] = {0, 1, 2, 3, 4, 0, 1, 2, 3, 4};
+float BRArray[dataLength] = {0, 1, 2, 3, 4, 0, 1, 2, 3, 4};
+const float Vthreshold = 30; // standard deviation threshold (30 lbs)
+const float Lthreshold = 75; // weight threshold (75 lbs)
+volatile int flag = 1;
+volatile int limpFlag = 1;
+volatile int LimpDetected;
+float weightFLLmean;
+float weightFRLmean;
+float weightBLLmean;
+float weightBRLmean;
+const int valueDelay = 100;
+char* weightData = new char[5];
+int startTime = 0;
+float FLStd;
+float FRStd;
+float BLStd;
+float BRStd;
+
+void setup() {
+  pinMode(PinFL, INPUT);
+  pinMode(PinBL, INPUT);
+  pinMode(PinFR, INPUT);
+  pinMode(PinBR, INPUT);
+  Serial.begin(9600);
+  SimbleeCOM.mode = LOW_LATENCY;
+  SimbleeCOM.begin();
+}
+
+void loop() {
+
+  startTime = millis();
+
+  FLData = analogRead(PinFL);
+  FRData = analogRead(PinFR);
+  BLData = analogRead(PinBL);
+  BRData = analogRead(PinBR);
+
+  //  FLArray[i] = WeightLookUpTable[FLData];
+  //  FRArray[i] = WeightLookUpTable[FRData];
+  //  BLArray[i] = WeightLookUpTable[BLData];
+  //  BRArray[i] = WeightLookUpTable[BRData];
+
+  FLArray[i] = convertWeight(FLData);
+  FRArray[i] = convertWeight(FRData);
+  BLArray[i] = convertWeight(BLData);
+  BRArray[i] = convertWeight(BRData);
+
+  i++;
+
+  if (i == dataLength) {
+    i = 0;
+  }
+
+#ifdef DEBUG
+  Serial.print("Back right data: ");
+  Serial.println(BRData);
+  Serial.print("Back left data: ");
+  Serial.println(BLData);
+  Serial.print("Front right data: ");
+  Serial.println(FRData);
+  Serial.print("Front Left data: ");
+  Serial.println(FLData);
+#endif
+
+  FLStd = standardDev(FLArray);
+  FRStd = standardDev(FRArray);
+  BLStd = standardDev(BLArray);
+  BRStd = standardDev(BRArray);
+
+  if (FLStd > Vthreshold or FRStd > Vthreshold or BLStd > Vthreshold or BRStd > Vthreshold) {
+    flag = 0;
+  } else {
+    flag = 1;
+  }
+
+  if (flag == 1) {
+    weightFLLmean = mean(FLArray);
+    weightFRLmean = mean(FRArray);
+    weightBLLmean = mean(BLArray);
+    weightBRLmean = mean(BRArray);
+    weightFLdifference = abs(weightFLLmean - weightFRLmean);
+    weightBLdifference = abs(weightBLLmean - weightBRLmean);
+    if (weightFLdifference > Lthreshold or weightBLdifference > Lthreshold) {
+      limpFlag = 1;
+    }
+    else {
+      limpFlag = 0;
+    }
+  }
+
+  weightFLLmean -= zerovalFL;
+  weightFRLmean -= zerovalFR;
+  weightBLLmean -= zerovalBL;
+  weightBRLmean -= zerovalBR;
+
+  weightData[0] = 0;
+  weightData[1] = randNum1;
+  weightData[2] = randNum2;
+  weightData[3] = randNum3;
+  weightData[4] = randNum4;
+
+  SimbleeCOM.send(weightData, 5);
+
+  Serial.println(millis() - startTime);
+
+  delay(valueDelay);
+
+}
+
+float convertWeight(int rawData)
+{
+  return (float) rawData * 105 / 96;
+}
+
+float standardDev(float* inputData) {
+  float compareRawData = 0;
+  float difference;
+  float dataMean = mean(inputData);
+  for (int i = 0; i < dataLength; i++) {
+    difference = inputData[i] - dataMean;
+    difference *= difference;
+    compareRawData += difference;
+
+  }
+  return sqrt(compareRawData / dataLength);
+}
+
+float mean(float* inputData) {
+  float weightsum = 0;
+  for (int i = 0; i < dataLength; i++) {
+    weightsum += inputData[i];
+  }
+  return weightsum / dataLength;
+}
+
+
