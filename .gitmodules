@@ -1,3 +1,3 @@
-[submodule "Eclipse/CowProgram"]
-	path = Eclipse/CowProgram
+[submodule "CowProgram"]
+	path = CowProgram
 	url = git@github.com:jacksondm33/CowProgram.git
